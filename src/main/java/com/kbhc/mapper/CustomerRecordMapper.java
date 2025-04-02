@@ -44,7 +44,7 @@ public class CustomerRecordMapper {
                     return entry;
                 }).toList();
 
-        customerRecord.getEntries().addAll(entries);
+        customerRecord.getRecordEntries().addAll(entries);
         return customerRecord;
     }
 
@@ -56,13 +56,5 @@ public class CustomerRecordMapper {
             }
         }
         throw new IllegalArgumentException("Unparsable date: " + dateStr);
-    }
-
-    private static int parseSteps(Object stepsObj) {
-        try {
-            return (int) Double.parseDouble(stepsObj.toString());
-        } catch (Exception e) {
-            return 0;
-        }
     }
 }

@@ -17,7 +17,7 @@ public class RecordEntry {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long recordEntryId;
 
     private LocalDateTime startPeriod;
     private LocalDateTime endPeriod;
@@ -39,10 +39,10 @@ public class RecordEntry {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_record_id")
-    private CustomerRecord record;
+    private CustomerRecord customerRecord;
 
-    public void updateRecord(CustomerRecord record) {
-        this.record = record;
+    public void updateRecord(CustomerRecord customerRecord) {
+        this.customerRecord = customerRecord;
     }
 
     @Builder

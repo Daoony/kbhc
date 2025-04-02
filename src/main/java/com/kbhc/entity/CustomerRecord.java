@@ -20,23 +20,23 @@ public class CustomerRecord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long customerRecordId;
 
     private String recordKey;
     private String memo;
 
-    @OneToMany(mappedBy = "record", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RecordEntry> entries = new ArrayList<>();
+    @OneToMany(mappedBy = "customerRecord", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RecordEntry> recordEntries = new ArrayList<>();
 
     @CreatedDate
     private LocalDateTime createdDate;
 
     @Builder
-    CustomerRecord(Long id, String recordKey, String memo, List<RecordEntry> entries, LocalDateTime createdDate) {
-        this.id = id;
+    CustomerRecord(Long customerRecordId, String recordKey, String memo, List<RecordEntry> recordEntries, LocalDateTime createdDate) {
+        this.customerRecordId = customerRecordId;
         this.recordKey = recordKey;
         this.memo = memo;
-        this.entries = entries != null ? entries : new ArrayList<>();
+        this.recordEntries = recordEntries != null ? recordEntries : new ArrayList<>();
         this.createdDate = createdDate;
     }
 }

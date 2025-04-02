@@ -1,11 +1,13 @@
 package com.kbhc.repository.qdsl;
 
 import com.kbhc.constant.enums.SearchType;
+import com.kbhc.constant.utils.UtilCommon;
 import com.kbhc.dto.record.*;
 import com.kbhc.entity.QCustomerRecord;
 import com.kbhc.entity.QRecordEntry;
-import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.ConstructorExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,7 +17,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 
 import static com.querydsl.core.types.dsl.Expressions.constant;
 
@@ -25,158 +27,141 @@ public class QRecordRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    QCustomerRecord record = QCustomerRecord.customerRecord;
-    QRecordEntry entry = QRecordEntry.recordEntry;
+    QCustomerRecord customerRecord = QCustomerRecord.customerRecord;
+    QRecordEntry recordEntry = QRecordEntry.recordEntry;
 
     public Page<RecordListDto> findRecordList(SearchRecordListDto dto, Pageable pageable) {
-        BooleanBuilder where = new BooleanBuilder();
+        SearchType type = dto.getSearchType();
 
-        BooleanExpression dateExpr = betweenDate(dto.getFromDate(), dto.getToDate());
-        BooleanExpression keyExpr = recordKeyEq(dto.getRecordKey());
+        List<RecordListDto> results = queryFactory
+                .select(getProjection(type))
+                .from(recordEntry)
+                .join(recordEntry.customerRecord, customerRecord)
+                .where(
+                        regDateBetween(dto.getFromDate(), dto.getToDate()),
+                        recordkeyEq(dto.getRecordKey())
+                )
+                .groupBy(getGroupByExpressions(type))
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
 
-        if (dateExpr != null) where.and(dateExpr);
-        if (keyExpr != null) where.and(keyExpr);
+        long total = queryFactory
+                .select(customerRecord.count())
+                .from(recordEntry)
+                .join(recordEntry.customerRecord, customerRecord)
+                .where(
+                        regDateBetween(dto.getFromDate(), dto.getToDate()),
+                        recordkeyEq(dto.getRecordKey())
+                )
+                .groupBy(getGroupByExpressions(type))
+                .fetch()
+                .size();
 
-        List<RecordListDto> results;
-
-        if (dto.getSearchType() == SearchType.DAILY) {
-            results = queryFactory
-                    .select(new QRecordListDto(
-                            constant("DAILY"),
-                            entry.startPeriod.year(),
-                            entry.startPeriod.month(),
-                            entry.startPeriod.dayOfMonth(),
-                            entry.steps.sum(),
-                            entry.caloriesValue.sum(),
-                            entry.distanceValue.sum(),
-                            record.recordKey
-                    ))
-                    .from(entry)
-                    .join(entry.record, record)
-                    .where(where)
-                    .groupBy(
-                            entry.startPeriod.year(),
-                            entry.startPeriod.month(),
-                            entry.startPeriod.dayOfMonth(),
-                            record.recordKey
-                    )
-                    .offset(pageable.getOffset())
-                    .limit(pageable.getPageSize())
-                    .fetch();
-        } else {
-            results = queryFactory
-                    .select(new QRecordListDto(
-                            constant("MONTHLY"),
-                            entry.startPeriod.year(),
-                            entry.startPeriod.month(),
-                            constant(0), // day = 0 for monthly
-                            entry.steps.sum(),
-                            entry.caloriesValue.sum(),
-                            entry.distanceValue.sum(),
-                            record.recordKey
-                    ))
-                    .from(entry)
-                    .join(entry.record, record)
-                    .where(where)
-                    .groupBy(
-                            entry.startPeriod.year(),
-                            entry.startPeriod.month(),
-                            record.recordKey
-                    )
-                    .offset(pageable.getOffset())
-                    .limit(pageable.getPageSize())
-                    .fetch();
-        }
-
-        long total;
-        if (dto.getSearchType() == SearchType.DAILY) {
-            total = queryFactory
-                    .select(record.recordKey.countDistinct())
-                    .from(entry)
-                    .join(entry.record, record)
-                    .where(where)
-                    .groupBy(
-                            entry.startPeriod.year(),
-                            entry.startPeriod.month(),
-                            entry.startPeriod.dayOfMonth(),
-                            record.recordKey
-                    )
-                    .fetch()
-                    .size();
-        } else {
-            total = queryFactory
-                    .select(record.recordKey.countDistinct())
-                    .from(entry)
-                    .join(entry.record, record)
-                    .where(where)
-                    .groupBy(
-                            entry.startPeriod.year(),
-                            entry.startPeriod.month(),
-                            record.recordKey
-                    )
-                    .fetch()
-                    .size();
-        }
-
-        return new PageImpl<>(results, pageable, Optional.of(total).orElse(0L));
+        return new PageImpl<>(results, pageable, total);
     }
 
     public List<RecordDailyListDto> findDailyRecords() {
-        BooleanBuilder where = new BooleanBuilder();
-
         return queryFactory
-                .select(new QRecordDailyListDto(
-                        constant("DAILY"),
-                        entry.startPeriod.year(),
-                        entry.startPeriod.month(),
-                        entry.startPeriod.dayOfMonth(),
-                        entry.steps.sum(),
-                        entry.caloriesValue.sum(),
-                        entry.distanceValue.sum(),
-                        record.recordKey
-                ))
-                .from(entry)
-                .join(entry.record, record)
-                .where(where)
+                .select(getDailyExportProjection())
+                .from(recordEntry)
+                .join(recordEntry.customerRecord, customerRecord)
                 .groupBy(
-                        entry.startPeriod.year(),
-                        entry.startPeriod.month(),
-                        entry.startPeriod.dayOfMonth(),
-                        record.recordKey
+                        recordEntry.startPeriod.year(),
+                        recordEntry.startPeriod.month(),
+                        recordEntry.startPeriod.dayOfMonth(),
+                        customerRecord.recordKey
                 )
                 .fetch();
     }
 
     public List<RecordMonthlyListDto> findMonthlyRecords() {
-        BooleanBuilder where = new BooleanBuilder();
-
         return queryFactory
-                .select(new QRecordMonthlyListDto(
-                        constant("MONTHLY"),
-                        entry.startPeriod.year(),
-                        entry.startPeriod.month(),
-                        entry.steps.sum(),
-                        entry.caloriesValue.sum(),
-                        entry.distanceValue.sum(),
-                        record.recordKey
-                ))
-                .from(entry)
-                .join(entry.record, record)
-                .where(where)
+                .select(getMonthlyExportProjection())
+                .from(recordEntry)
+                .join(recordEntry.customerRecord, customerRecord)
                 .groupBy(
-                        entry.startPeriod.year(),
-                        entry.startPeriod.month(),
-                        record.recordKey
+                        recordEntry.startPeriod.year(),
+                        recordEntry.startPeriod.month(),
+                        customerRecord.recordKey
                 )
                 .fetch();
     }
 
-    private BooleanExpression betweenDate(String from, String to) {
-        if (from == null || to == null) return null;
-        return entry.startPeriod.between(LocalDateTime.parse(from), LocalDateTime.parse(to));
+    private ConstructorExpression<RecordListDto> getProjection(SearchType type) {
+        if (type == SearchType.DAILY) {
+            return new QRecordListDto(
+                    constant("DAILY"),
+                    recordEntry.startPeriod.year(),
+                    recordEntry.startPeriod.month(),
+                    recordEntry.startPeriod.dayOfMonth(),
+                    recordEntry.steps.sum(),
+                    recordEntry.caloriesValue.sum(),
+                    recordEntry.distanceValue.sum(),
+                    customerRecord.recordKey
+            );
+        } else {
+            return new QRecordListDto(
+                    constant("MONTHLY"),
+                    recordEntry.startPeriod.year(),
+                    recordEntry.startPeriod.month(),
+                    constant(0),
+                    recordEntry.steps.sum(),
+                    recordEntry.caloriesValue.sum(),
+                    recordEntry.distanceValue.sum(),
+                    customerRecord.recordKey
+            );
+        }
     }
 
-    private BooleanExpression recordKeyEq(String recordKey) {
-        return recordKey != null ? record.recordKey.eq(recordKey) : null;
+    private Expression<?>[] getGroupByExpressions(SearchType type) {
+        if (type == SearchType.DAILY) {
+            return new Expression<?>[]{
+                    recordEntry.startPeriod.year(),
+                    recordEntry.startPeriod.month(),
+                    recordEntry.startPeriod.dayOfMonth(),
+                    customerRecord.recordKey
+            };
+        } else {
+            return new Expression<?>[]{
+                    recordEntry.startPeriod.year(),
+                    recordEntry.startPeriod.month(),
+                    customerRecord.recordKey
+            };
+        }
+    }
+
+    private ConstructorExpression<RecordDailyListDto> getDailyExportProjection() {
+        return new QRecordDailyListDto(
+                constant("DAILY"),
+                recordEntry.startPeriod.year(),
+                recordEntry.startPeriod.month(),
+                recordEntry.startPeriod.dayOfMonth(),
+                recordEntry.steps.sum(),
+                recordEntry.caloriesValue.sum(),
+                recordEntry.distanceValue.sum(),
+                customerRecord.recordKey
+        );
+    }
+
+    private ConstructorExpression<RecordMonthlyListDto> getMonthlyExportProjection() {
+        return new QRecordMonthlyListDto(
+                constant("MONTHLY"),
+                recordEntry.startPeriod.year(),
+                recordEntry.startPeriod.month(),
+                recordEntry.steps.sum(),
+                recordEntry.caloriesValue.sum(),
+                recordEntry.distanceValue.sum(),
+                customerRecord.recordKey
+        );
+    }
+
+    private BooleanExpression regDateBetween(String startRegDate, String endRegDate) {
+        Map<String, LocalDateTime> map = UtilCommon.getLocalDateTimeForSearch(startRegDate, endRegDate);
+        return map.isEmpty() ? null : recordEntry.startPeriod.between(map.get("startDateTime"), map.get("endDateTime"));
+    }
+
+    private BooleanExpression recordkeyEq(String recordkey) {
+        return recordkey != null ? customerRecord.recordKey.eq(recordkey) : null;
     }
 }

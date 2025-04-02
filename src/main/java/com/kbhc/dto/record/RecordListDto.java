@@ -5,7 +5,6 @@ import lombok.Getter;
 
 import java.math.BigDecimal;
 
-
 @Getter
 public class RecordListDto {
     private final String type;

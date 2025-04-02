@@ -10,8 +10,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,17 +24,20 @@ public class RecordController {
 
     private final RecordService recordService;
 
-    @PostMapping
-    public ResponseEntity<ApiResult> registerRecord(@Valid @RequestBody RegisterRecordDto dto) {
+    @GetMapping
+    public ResponseEntity<ApiResult> searchRecordList(@Valid SearchRecordListDto dto) {
         ApiResult apiResult = new ApiResult();
 
-        RecordIdDto recordIdDto = recordService.registerRecord(dto);
-        apiResult.setData(recordIdDto);
+        PageRequest pageRequest = PageRequest.of(dto.getPageNumber() - 1, dto.getPageSize());
+        Page<RecordListDto> resultPage = recordService.searchList(dto, pageRequest);
+
+        PagingResult pagingResult = UtilCommon.makePagingResult(resultPage);
+        apiResult.setData(pagingResult);
 
         return ResponseEntity.ok().body(apiResult);
     }
 
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping
     public ResponseEntity<ApiResult> uploadRecords(@RequestPart("file") MultipartFile file)  {
         ApiResult apiResult = new ApiResult();
 
@@ -53,19 +54,4 @@ public class RecordController {
 
         recordService.exportRecordExcel(response, dailyList, monthlyList);
     }
-
-
-    @GetMapping
-    public ResponseEntity<ApiResult> searchRecordList(@Valid SearchRecordListDto dto) {
-        ApiResult apiResult = new ApiResult();
-
-        PageRequest pageRequest = PageRequest.of(dto.getPageNumber() - 1, dto.getPageSize());
-        Page<RecordListDto> resultPage = recordService.searchList(dto, pageRequest);
-
-        PagingResult pagingResult = UtilCommon.makePagingResult(resultPage);
-        apiResult.setData(pagingResult);
-
-        return ResponseEntity.ok().body(apiResult);
-    }
-
 }

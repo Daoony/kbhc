@@ -2,7 +2,6 @@ package com.kbhc.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kbhc.constant.enums.ErrorCode;
-import com.kbhc.constant.enums.SearchType;
 import com.kbhc.constant.utils.ExportExcel;
 import com.kbhc.dto.record.*;
 import com.kbhc.entity.CustomerRecord;
@@ -32,10 +31,6 @@ public class RecordService {
 
     public Page<RecordListDto> searchList(SearchRecordListDto dto, Pageable pageable) {
         return qRecordRepository.findRecordList(dto, pageable);
-    }
-
-    public RecordIdDto registerRecord(RegisterRecordDto dto) {
-        return saveRecord(dto);
     }
 
     public RecordIdDto registerRecordList(MultipartFile file) {
@@ -70,6 +65,6 @@ public class RecordService {
     private RecordIdDto saveRecord(RegisterRecordDto dto) {
         CustomerRecord record = CustomerRecordMapper.toEntity(dto);
         CustomerRecord saved = recordRepository.save(record);
-        return new RecordIdDto(saved.getId());
+        return new RecordIdDto(saved.getCustomerRecordId());
     }
 }
